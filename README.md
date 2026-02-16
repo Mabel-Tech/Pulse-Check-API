@@ -1,135 +1,411 @@
 # Pulse-Check-API ("Watchdog" Sentinel)
-This challenge is designed to test your ability to bridge Computer Science fundamentals with Modern Backend Engineering.
 
-## 1. Business Context
-> **Client:** *CritMon Servers Inc.* (A Critical Infrastructure Monitoring Company).
+A Dead Man's Switch API for critical infrastructure monitoring.
 
-### The Problem
-CritMon provides monitoring for remote solar farms and unmanned weather stations in areas with poor connectivity. These devices are supposed to send "I'm alive" signals every hour.
+## Architecture
 
-Currently, CritMon has no way of knowing if a device has gone offline (due to power failure or theft) until a human manually checks the logs. They need a system that alerts *them* when a device *stops* talking.
+![Architecture Diagram](architecture-diagram.png)
 
-### The Solution
-You need to build a **Dead Man’s Switch API**. Devices will register a "monitor" with a countdown timer (e.g., 60 seconds). If the device fails to "ping" (send a heartbeat) to the API before the timer runs out, the system automatically triggers an alert.
+A Spring Boot REST API with PostgreSQL database for device monitoring and alerting.
 
----
+## Setup Instructions
 
-## 2. Technical Objective
-Build a backend service that manages stateful timers.
+### Prerequisites
+- Java 21 or higher
+- PostgreSQL 12 or higher
+- Maven 3.8 or higher
 
-* **Registration:** Allow a client to create a monitor with a specific timeout duration.
-* **Heartbeat:** Reset the countdown when a ping is received.
-* **Trigger:** Fire a webhook (or log a critical error) if the countdown reaches zero.
+### Installation
 
+1. **Clone the repository:**
+```bash
+git clone https://github.com/Mabel-Tech/Pulse-Check-API.git
+cd Pulse-Check-API/pulse-check-api
+```
 
----
+2. **Configure PostgreSQL:**
+```sql
+CREATE DATABASE pulse_check;
+CREATE USER postgres WITH PASSWORD 'YOUR_PASSWORD_HERE';
+GRANT ALL PRIVILEGES ON DATABASE pulse_check TO postgres;
+```
 
-## 3. Getting Started
+3. **Update application.yaml:**
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pulse_check
+    username: postgres
+    password: YOUR_PASSWORD_HERE
+```
 
-1.  **Fork this Repository:** Do not clone it directly. Create a fork to your own GitHub account.
-2.  **Environment:** You may use **Node.js, Python, Java or Go, etc.**.
-3.  **Submission:** Your final submission will be a link to your forked repository containing:
-    * The source code.
-    * The **Architecture Diagram**
-    * The `README.md` with documentation.
+4. **Configure Environment Variables:**
+Create a `.env` file or set environment variables:
+```bash
+# Gmail SMTP Configuration
+GMAIL_USERNAME=your-email@gmail.com
+GMAIL_PASSWORD=your-app-password
+```
 
----
+5. **Run the application:**
+```bash
+./mvnw.cmd spring-boot:run
+```
 
-## 4. The Architecture Diagram 
-**Task:** Before you write any code, you must design the logic flow.
-**Deliverable:** A **Sequence Diagram** or **State Flowchart** embedded in your `README.md`.
+The API will start on `http://localhost:8081`
 
----
+## API Documentation
 
-## 5. User Stories & Acceptance Criteria
+### Base URL
+```
+http://localhost:8081
+```
 
-### User Story 1: Registering a Monitor
-**As a** device administrator,  
-**I want to** create a new monitor for my device,  
-**So that** the system knows to track its status.
+### Endpoints
 
-**Acceptance Criteria:**
-- [ ] The API accepts a `POST /monitors` request.
-- [ ] Input: `{"id": "device-123", "timeout": 60, "alert_email": "admin@critmon.com"}`.
-- [ ] The system starts a countdown timer for 60 seconds associated with `device-123`.
-- [ ] Response: `201 Created` with a confirmation message.
+#### 1. Create Monitor
+**POST** `/monitors`
 
-### User Story 2: The Heartbeat (Reset)
-**As a** remote device,  
-**I want to** send a signal to the server,  
-**So that** my timer is reset and no alert is sent.
+Create a new monitor with timeout and alert configuration.
 
-**Acceptance Criteria:**
-- [ ] The API accepts a `POST /monitors/{id}/heartbeat` request.
-- [ ] If the ID exists and the timer has NOT expired:
-    - [ ] Restart the countdown from the beginning (e.g., reset to 60 seconds).
-    - [ ] Return `200 OK`.
-- [ ] If the ID does not exist:
-    - [ ] Return `404 Not Found`.
+**Request Body:**
+```json
+{
+  "id": "device-123",
+  "timeout": 60,
+  "alertEmail": "admin@critmon.com"
+}
+```
 
-### User Story 3: The Alert (Failure State)
-**As a** support engineer,  
-**I want to** be notified immediately if a device stops sending heartbeats,  
-**So that** I can deploy a repair team.
+**Validation Rules:**
+- `id`: 3-50 characters, alphanumeric + hyphens/underscores
+- `timeout`: 10-86400 seconds (10 seconds to 24 hours)
+- `alertEmail`: Valid email format
 
-**Acceptance Criteria:**
-- [ ] If the timer for `device-123` reaches 0 seconds (no heartbeat received):
-    - [ ] The system must internally "fire" an alert.
-    - [ ] **Implementation:** For this project, simply `console.log` a JSON object: `{"ALERT": "Device device-123 is down!", "time": <timestamp>}`. (Or simulate sending an email).
-    - [ ] The monitor status changes to `down`.
+**Response (201 Created):**
+```json
+{
+  "message": "Monitor created successfully",
+  "deviceId": "device-123",
+  "timeout": "60",
+  "status": "ACTIVE"
+}
+```
 
----
+#### 2. Send Heartbeat
+**POST** `/monitors/{id}/heartbeat`
 
-## 6. Bonus User Story (The "Snooze" Button)
-**As a** maintenance technician,  
-**I want to** pause monitoring while I am repairing a device,  
-**So that** I don't trigger false alarms.
+Reset the countdown timer for an existing monitor.
 
-**Acceptance Criteria:**
-- [ ] Create a `POST /monitors/{id}/pause` endpoint.
-- [ ] When called, the timer stops completely. No alerts will fire.
-- [ ] Calling the heartbeat endpoint again automatically "un-pauses" the monitor and restarts the timer.
+**Path Parameters:**
+- `id`: Device identifier
 
----
+**Response (200 OK):**
+```json
+{
+  "message": "Heartbeat received successfully",
+  "deviceId": "device-123",
+  "status": "ACTIVE",
+  "nextExpiry": "2026-02-14T10:05:30"
+}
+```
 
-## 7. The "Developer's Choice" Challenge
-We value engineers who look for "what's missing."
+**Error Responses:**
+- `404 Not Found`: Monitor with specified ID doesn't exist
 
-**Task:** Identify **one** additional feature that makes this system more robust or user-friendly.
-1.  **Implement it.**
-2.  **Document it:** Explain *why* you added it in your README.
+#### 3. Pause Monitor
+**POST** `/monitors/{id}/pause`
 
----
+Stop monitoring for a device (maintenance mode).
 
-## 8. Documentation Requirements
-Your final `README.md` must replace these instructions. It must cover:
+**Path Parameters:**
+- `id`: Device identifier
 
-1.  **Architecture Diagram** 
-2.  **Setup Instructions** 
-3.  **API Documentation** 
-4.  **The Developer's Choice:** Explanation of your added feature.
+**Response (200 OK):**
+```json
+{
+  "message": "Monitor paused successfully",
+  "deviceId": "device-123",
+  "status": "PAUSED"
+}
+```
 
----
-Submit your repo link via the [online](https://forms.office.com/e/rGKtfeZCsH) form.
+#### 4. Get Monitor Status
+**GET** `/monitors/{id}`
 
-## 🛑 Pre-Submission Checklist
-**WARNING:** Before you submit your solution, you **MUST** pass every item on this list.
-If you miss any of these critical steps, your submission will be **automatically rejected** and you will **NOT** be invited to an interview.
+Retrieve current status and configuration of a monitor.
 
-### 1. 📂 Repository & Code
-- [ ] **Public Access:** Is your GitHub repository set to **Public**? (We cannot review private repos).
-- [ ] **Clean Code:** Did you remove unnecessary files (like `node_modules`, `.env` with real keys, or `.DS_Store`)?
-- [ ] **Run Check:** if we clone your repo and run `npm start` (or equivalent), does the server start immediately without crashing?
+**Path Parameters:**
+- `id`: Device identifier
 
-### 2. 📄 Documentation (Crucial)
-- [ ] **Architecture Diagram:** Did you include a visual Diagram (Flowchart or Sequence Diagram) in the README?
-- [ ] **README Swap:** Did you **DELETE** the original instructions (the problem brief) from this file and replace it with your own documentation?
-- [ ] **API Docs:** Is there a clear list of Endpoints and Example Requests in the README?
+**Response (200 OK):**
+```json
+{
+  "id": "device-123",
+  "timeout": 60,
+  "alertEmail": "admin@critmon.com",
+  "status": "ACTIVE",
+  "lastHeartbeat": "2026-02-14T10:04:30",
+  "expiresAt": "2026-02-14T10:05:30",
+  "createdAt": "2026-02-14T10:03:30",
+  "updatedAt": "2026-02-14T10:04:30"
+}
+```
 
+#### 5. Get All Monitors
+**GET** `/monitors`
 
-### 3. 🧹 Git Hygiene
-- [ ] **Commit History:** Does your repo have multiple commits with meaningful messages? (A single "Initial Commit" is a red flag).
+Retrieve all monitors with summary statistics.
 
----
-**Ready?**
-If you checked all the boxes above, submit your repository link in the application form. Good luck! 🚀
+**Response (200 OK):**
+```json
+{
+  "monitors": [
+    {
+      "id": "device-123",
+      "timeout": 60,
+      "alertEmail": "admin@critmon.com",
+      "status": "ACTIVE",
+      "lastHeartbeat": "2026-02-14T10:04:30",
+      "expiresAt": "2026-02-14T10:05:30",
+      "createdAt": "2026-02-14T10:03:30",
+      "updatedAt": "2026-02-14T10:04:30"
+    }
+  ],
+  "total": 1
+}
+```
+
+## Error Handling
+
+### Validation Errors (400 Bad Request)
+```json
+{
+  "timestamp": "2026-02-14T10:05:00",
+  "status": 400,
+  "error": "Validation Failed",
+  "message": "Request validation failed",
+  "validationErrors": {
+    "id": "Device ID must be 3-50 characters long...",
+    "timeout": "Timeout must be at least 10 seconds",
+    "alertEmail": "Email must be a valid format"
+  },
+  "path": "uri=/monitors"
+}
+```
+
+### Not Found Errors (404 Not Found)
+```json
+{
+  "timestamp": "2026-02-14T10:05:00",
+  "status": 404,
+  "error": "Monitor Not Found",
+  "message": "Monitor with ID 'device-456' not found",
+  "path": "uri=/monitors/device-456/heartbeat"
+}
+```
+
+### Server Errors (500 Internal Server Error)
+```json
+{
+  "timestamp": "2026-02-14T10:05:00",
+  "status": 500,
+  "error": "Internal Server Error",
+  "message": "An unexpected error occurred. Please try again later.",
+  "path": "uri=/monitors"
+}
+```
+
+## Monitoring Gap Fix
+
+### Problem
+Original system had monitoring gaps where:
+- Timers stopped after first alert
+- No repeated alerts for extended outages  
+- Inaccurate downtime tracking
+
+### Solution
+- **Continuous Monitoring**: Timers keep running after alerts
+- **Repeated Alerts**: Every 60 seconds during outages
+- **Accurate Tracking**: Precise downtime measurement
+- **Immediate Recovery**: Heartbeat instantly stops alerts
+
+### Behavior
+```
+Device expires → Alert #1 → Timer resets → Alert #2 → Timer resets → ...
+Heartbeat received → Status ACTIVE → Alerts stop
+```
+
+## Testing
+
+### Example Test Sequence
+
+1. **Create a monitor:**
+```bash
+curl -X POST http://localhost:8081/monitors \
+  -H "Content-Type: application/json" \
+  -d '{"id": "test-device", "timeout": 30, "alertEmail": "test@example.com"}'
+```
+
+2. **Send heartbeat:**
+```bash
+curl -X POST http://localhost:8081/monitors/test-device/heartbeat
+```
+
+3. **Check status:**
+```bash
+curl http://localhost:8081/monitors/test-device
+```
+
+4. **Pause monitoring:**
+```bash
+curl -X POST http://localhost:8081/monitors/test-device/pause
+```
+
+## Developer's Choice Challenge
+
+### Problem Identification
+The original system had several critical gaps that made it unsuitable for production use:
+- **No Audit Trail**: Alerts only logged to console, lost on restart
+- **No Recovery Visibility**: Administrators couldn't tell when devices recovered
+- **Monitoring Gaps**: Timers stopped after first alert, missing extended outages
+
+### Solutions Implemented
+
+#### 1. Alert History System
+**What was missing**: Persistent alert tracking for compliance and analysis
+**Solution**: Database storage with comprehensive API endpoints
+**Impact**: Transforms system from simple alerting to observability platform
+
+#### 2. Recovery Notifications  
+**What was missing**: Complete incident lifecycle visibility
+**Solution**: Automatic "Device is UP" notifications with downtime calculation
+**Impact**: Eliminates manual status checking, improves operational efficiency
+
+#### 3. Monitoring Gap Fix
+**What was missing**: Continuous monitoring during extended outages
+**Solution**: Repeated alerts every 60 seconds with timer reset logic
+**Impact**: Ensures no extended downtime goes unnoticed
+
+### Business Value
+These features address real-world production needs:
+- **Compliance**: Complete audit trails for regulations
+- **Operations**: Automated notifications reduce manual work
+- **Reliability**: Continuous monitoring prevents missed incidents
+- **Analytics**: Data-driven device performance analysis
+
+## Alert History System
+
+### Features
+- **Database Storage**: All alerts persisted to `alert_history` table
+- **API Endpoints**: Retrieve alerts by device, time range, or recent activity
+- **Audit Trail**: Complete incident tracking for compliance
+- **Analytics**: Device performance and reliability analysis
+
+### API Endpoints
+- `GET /alerts` - All alert history
+- `GET /alerts/device/{deviceId}` - Device-specific alerts
+- `GET /alerts/recent` - Latest system alerts
+- `GET /alerts/period?start={start}&end={end}` - Time-range filtering
+
+### Business Value
+- **Incident Analysis**: Identify problematic devices and patterns
+- **Compliance Reporting**: Generate audit trails for regulations  
+- **Performance Monitoring**: Track system reliability over time
+- **SLA Tracking**: Monitor alert frequency against service levels
+
+## Email Alert System
+
+### Features
+- **Professional HTML Emails**: Rich formatting with device details
+- **Dual Channels**: Email + console logging + database storage
+- **Retry Logic**: 3 attempts with exponential backoff
+- **Graceful Degradation**: System continues if email fails
+
+### Supported Providers
+- **Gmail**: Use App Passwords (recommended)
+- **Outlook**: SMTP with authentication
+- **Corporate SMTP**: Custom server configuration
+- **Amazon SES**: Simple Email Service
+
+#### 3. Email Configuration
+Configure email settings using environment variables:
+
+```yaml
+spring:
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GMAIL_USERNAME}
+    password: ${GMAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 30000
+          timeout: 30000
+          writetimeout: 30000
+          ssl:
+            trust: smtp.gmail.com
+            enable: false
+          socketFactory:
+            port: 587
+            fallback: true
+    from: noreply@pulsecheck.com
+```
+
+#### 4. Supported Email Providers
+- **Gmail**: Use App Passwords (recommended)
+
+### Gmail Setup
+1. Enable 2-Factor Authentication on your Gmail account
+2. Generate an App Password:
+   - Go to Google Account settings
+   - Security → 2-Step Verification → App passwords
+   - Create new app password
+3. Use App Password in configuration (not regular password)
+
+#### 4. Error Handling
+- Failed email attempts are logged but don't stop alert processing
+- Console logging continues regardless of email status
+- Database history is always maintained
+- Graceful degradation if email service is unavailable
+
+### Setup Instructions
+
+1. **Configure SMTP Settings**:
+   - Update `application.yaml` with your email provider
+   - For Gmail: Generate an App Password
+   - Set `test-connection: true` to verify configuration
+
+2. **Test Email Alerts**:
+   ```bash
+   curl -X POST http://localhost:8081/monitors/test-device \
+     -H "Content-Type: application/json" \
+     -d '{"id": "test-device", "timeout": 10, "alertEmail": "your-email@test.com"}'
+   ```
+
+3. **Monitor Email Delivery**:
+   - Check application logs for email delivery status
+   - Verify email receipt in inbox
+   - Check spam folder if email not received
+
+### Security Notes
+
+- Use App Passwords for Gmail instead of regular passwords
+- Store email credentials securely (environment variables recommended)
+- Consider using email service APIs for production deployments
+- Test email configuration before production use
+
+This email alert system ensures administrators are immediately notified of device failures through multiple channels while maintaining system reliability and audit capabilities.
+
+## Recovery Notifications
+
+### Features
+- **Automatic Detection**: Monitors DOWN → ACTIVE transitions
+- **Downtime Calculation**: Precise outage duration in minutes
+- **Recovery Emails**: Professional "Device is UP" notifications
+- **History Tracking**: All recoveries saved to database
