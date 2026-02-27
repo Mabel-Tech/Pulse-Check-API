@@ -2,10 +2,12 @@ package com.mabelowusu.pulse_check_api.service;
 
 import com.mabelowusu.pulse_check_api.model.AlertHistory;
 import com.mabelowusu.pulse_check_api.model.Monitor;
+import com.mabelowusu.pulse_check_api.model.MonitorStatus;
 import com.mabelowusu.pulse_check_api.model.RecoveryHistory;
 import com.mabelowusu.pulse_check_api.repository.AlertHistoryRepository;
 import com.mabelowusu.pulse_check_api.repository.MonitorRepository;
 import com.mabelowusu.pulse_check_api.repository.RecoveryHistoryRepository;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 @Service
+@RequiredArgsConstructor
 public class AlertService {
 
     private static final Logger log = LoggerFactory.getLogger(AlertService.class);
@@ -22,26 +25,13 @@ public class AlertService {
     private final RecoveryHistoryRepository recoveryHistoryRepository;
     private final MonitorRepository monitorRepository;
     private final EmailService emailService;
-    
-    // Explicit constructor for dependency injection
-    public AlertService(AlertHistoryRepository alertHistoryRepository, 
-                      RecoveryHistoryRepository recoveryHistoryRepository,
-                      MonitorRepository monitorRepository,
-                      EmailService emailService) {
-        this.alertHistoryRepository = alertHistoryRepository;
-        this.recoveryHistoryRepository = recoveryHistoryRepository;
-        this.monitorRepository = monitorRepository;
-        this.emailService = emailService;
-    }
 
     public void triggerAlert(Monitor monitor) {
         log.warn("ALERT TRIGGERED: Device {} is down!", monitor.getId());
-        
-        // Update monitor status to DOWN and mark as alerted
-        monitor.setStatus(Monitor.MonitorStatus.DOWN);
+
+        monitor.setStatus(MonitorStatus.DOWN);
         monitor.setAlerted(true);
-        
-        // Log the alert as required by specifications
+
         String alertJson = String.format(
                 "{\"ALERT\": \"Device %s is down!\", \"time\": \"%s\"}",
                 monitor.getId(),
@@ -50,14 +40,11 @@ public class AlertService {
         
         System.out.println(alertJson);
         log.info("Alert logged: {}", alertJson);
-        
-        // Save alert to database for history tracking
+
         saveAlertToHistory(monitor);
-        
-        // Save monitor state to persist timer reset and alert status
+
         monitorRepository.save(monitor);
-        
-        // Send email alert
+
         sendEmailAlert(monitor);
     }
     

@@ -6,16 +6,14 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/monitors")
+@RequiredArgsConstructor
 public class MonitorController {
 
-    private MonitorService monitorService;
-
-    public MonitorController(MonitorService monitorService) {
-        this.monitorService = monitorService;
-    }
+    private final MonitorService monitorService;
 
     @PostMapping
     public ResponseEntity<MonitorCreateResponse> createMonitor(@Valid @RequestBody MonitorRequest request) {

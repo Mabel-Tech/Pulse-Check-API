@@ -2,6 +2,7 @@ package com.mabelowusu.pulse_check_api.service;
 
 import com.mabelowusu.pulse_check_api.model.Monitor;
 import com.mabelowusu.pulse_check_api.repository.MonitorRepository;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,20 +12,14 @@ import java.time.LocalDateTime;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@RequiredArgsConstructor
 public class TimerService {
 
     private static final Logger log = LoggerFactory.getLogger(TimerService.class);
     
-    private AlertService alertService;
-    private MonitorRepository monitorRepository;
-    
-    // Explicit constructor for dependency injection
-    public TimerService(AlertService alertService, MonitorRepository monitorRepository) {
-        this.alertService = alertService;
-        this.monitorRepository = monitorRepository;
-    }
-    
-    // In-memory storage for active timers
+    private final AlertService alertService;
+    private final MonitorRepository monitorRepository;
+
     private final ConcurrentHashMap<String, Monitor> activeTimers = new ConcurrentHashMap<>();
 
     public void startTimer(Monitor monitor) {

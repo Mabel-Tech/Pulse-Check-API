@@ -1,5 +1,5 @@
 server:
-  port: 8081
+  port: ${SERVER_PORT:8082}
 
 spring:
   application:
@@ -27,13 +27,13 @@ spring:
           socketFactory:
             port: 587
             fallback: true
-    from: noreply@pulsecheck.com
+    from: "mabel.ewurabenah@gmail.com"
     test-connection: false
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/pulse_check
-    username: postgres
-    password: MabelTech
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/pulse_check}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: update
@@ -44,8 +44,21 @@ spring:
 
 logging:
   level:
-    org.springframework.web: DEBUG
-    com.mabel: DEBUG
-    root: INFO
+    org.springframework.web: ${LOG_LEVEL_SPRING_WEB:DEBUG}
+    com.mabel: ${LOG_LEVEL_COM_MABEL:DEBUG}
+    root: ${LOG_LEVEL_ROOT:INFO}
   pattern:
-    console: "[%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n"
+    console: "[%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n]"
+
+# Custom Application Configuration
+pulse-check:
+  timer:
+    check-interval-ms: ${TIMER_CHECK_INTERVAL_MS:1000}
+  alert:
+    interval-seconds: ${ALERT_INTERVAL_SECONDS:60}
+    max-retries: ${MAX_EMAIL_RETRIES:3}
+  validation:
+    monitor-id-min-length: ${MONITOR_ID_MIN_LENGTH:3}
+    monitor-id-max-length: ${MONITOR_ID_MAX_LENGTH:50}
+    monitor-timeout-min-seconds: ${MONITOR_TIMEOUT_MIN_SECONDS:30}
+    monitor-timeout-max-seconds: ${MONITOR_TIMEOUT_MAX_SECONDS:86400}

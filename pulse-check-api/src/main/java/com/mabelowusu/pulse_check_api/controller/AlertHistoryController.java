@@ -1,22 +1,18 @@
 package com.mabelowusu.pulse_check_api.controller;
 
 import com.mabelowusu.pulse_check_api.dto.AlertHistoryListResponse;
-import com.mabelowusu.pulse_check_api.dto.AlertHistoryResponse;
-import com.mabelowusu.pulse_check_api.model.AlertHistory;
 import com.mabelowusu.pulse_check_api.service.AlertHistoryService;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @RestController
 @RequestMapping("/alerts")
 public class AlertHistoryController {
 
-    private AlertHistoryService alertHistoryService;
+    private final AlertHistoryService alertHistoryService;
 
     public AlertHistoryController(AlertHistoryService alertHistoryService) {
         this.alertHistoryService = alertHistoryService;

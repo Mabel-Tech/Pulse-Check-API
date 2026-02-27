@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.util.FileCopyUtils;
+import org.springframework.beans.factory.annotation.Value;
 
 import jakarta.mail.internet.MimeMessage;
 
@@ -18,10 +19,13 @@ import java.nio.charset.StandardCharsets;
 public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
+    private static final int MAX_EMAIL_RETRIES = 3;
     
     private final JavaMailSender mailSender;
     private final ResourceLoader resourceLoader;
-    private final String from = "noreply@pulsecheck.com";
+    
+    @Value("${spring.mail.from}")
+    private String from;
     
     // Explicit constructor for dependency injection
     public EmailService(JavaMailSender mailSender, ResourceLoader resourceLoader) {
@@ -49,7 +53,7 @@ public class EmailService {
             helper.setText(htmlContent, true);
             
             // Retry logic for sending email
-            sendEmailWithRetry(message, 3);
+            sendEmailWithRetry(message);
             
             log.info("Alert email sent successfully to {} for device {}", toEmail, deviceId);
             
@@ -80,7 +84,7 @@ public class EmailService {
             helper.setText(htmlContent, true);
             
             // Retry logic for sending email
-            sendEmailWithRetry(message, 3);
+            sendEmailWithRetry(message);
             
             log.info("Recovery email sent successfully to {} for device {}", toEmail, deviceId);
             
@@ -102,18 +106,22 @@ public class EmailService {
         }
     }
     
-    private void sendEmailWithRetry(MimeMessage message, int maxRetries) {
+    private void sendEmailWithRetry(MimeMessage message) {
         int attempt = 0;
-        while (attempt < maxRetries) {
+        boolean success = false;
+        
+        while (!success && attempt < MAX_EMAIL_RETRIES) {
+            attempt++;
             try {
                 mailSender.send(message);
-                return; // Success, exit retry loop
+                success = true;
+                log.info("Email sent successfully on attempt {}", attempt);
             } catch (Exception e) {
-                attempt++;
                 log.warn("Email send attempt {} failed: {}", attempt, e.getMessage());
                 
-                if (attempt >= maxRetries) {
-                    throw e; // Re-throw after final attempt
+                if (attempt >= MAX_EMAIL_RETRIES) {
+                    log.error("Failed to send email after {} attempts", MAX_EMAIL_RETRIES);
+                    throw new RuntimeException("Email delivery failed after " + MAX_EMAIL_RETRIES + " attempts", e);
                 }
                 
                 try {

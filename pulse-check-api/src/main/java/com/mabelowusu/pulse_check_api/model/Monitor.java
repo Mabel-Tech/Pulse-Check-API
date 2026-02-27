@@ -1,17 +1,22 @@
 package com.mabelowusu.pulse_check_api.model;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
 @Entity
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 @Table(name = "monitors")
 public class Monitor {
-
-    // Default constructor for JPA
-    public Monitor() {}
 
     @Id
     private String id;
@@ -24,6 +29,7 @@ public class Monitor {
     
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private MonitorStatus status = MonitorStatus.ACTIVE;
     
     @Column(nullable = false)
@@ -41,16 +47,8 @@ public class Monitor {
     private LocalDateTime updatedAt;
     
     @Column(nullable = false)
+    @Builder.Default
     private boolean alerted = false;
-    
-    public Monitor(String id, Integer timeout, String alertEmail) {
-        this.id = id;
-        this.timeout = timeout;
-        this.alertEmail = alertEmail;
-        this.lastHeartbeat = LocalDateTime.now();
-        this.expiresAt = LocalDateTime.now().plusSeconds(timeout);
-        this.status = MonitorStatus.ACTIVE;
-    }
     
     public void resetTimer() {
         this.lastHeartbeat = LocalDateTime.now();
@@ -62,86 +60,8 @@ public class Monitor {
     public void pause() {
         this.status = MonitorStatus.PAUSED;
     }
-    
-    public void resume() {
-        this.status = MonitorStatus.ACTIVE;
-        resetTimer();
-    }
-    
     public boolean isExpired() {
         return LocalDateTime.now().isAfter(expiresAt) && 
                (status == MonitorStatus.ACTIVE || status == MonitorStatus.DOWN);
-    }
-    
-    // Explicit getters as fallback for Lombok @Data
-    public String getId() {
-        return id;
-    }
-    
-    public Integer getTimeout() {
-        return timeout;
-    }
-    
-    public String getAlertEmail() {
-        return alertEmail;
-    }
-    
-    public MonitorStatus getStatus() {
-        return status;
-    }
-    
-    public LocalDateTime getLastHeartbeat() {
-        return lastHeartbeat;
-    }
-    
-    public LocalDateTime getExpiresAt() {
-        return expiresAt;
-    }
-    
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-    
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-    
-    // Explicit setters as fallback for Lombok @Data
-    public void setId(String id) {
-        this.id = id;
-    }
-    
-    public void setTimeout(Integer timeout) {
-        this.timeout = timeout;
-    }
-    
-    public void setAlertEmail(String alertEmail) {
-        this.alertEmail = alertEmail;
-    }
-    
-    public void setStatus(MonitorStatus status) {
-        this.status = status;
-    }
-    
-    public void setLastHeartbeat(LocalDateTime lastHeartbeat) {
-        this.lastHeartbeat = lastHeartbeat;
-    }
-    
-    public void setExpiresAt(LocalDateTime expiresAt) {
-        this.expiresAt = expiresAt;
-    }
-    
-    public boolean isAlerted() {
-        return alerted;
-    }
-    
-    public void setAlerted(boolean alerted) {
-        this.alerted = alerted;
-    }
-    
-    public enum MonitorStatus {
-        ACTIVE,
-        PAUSED,
-        DOWN
     }
 }

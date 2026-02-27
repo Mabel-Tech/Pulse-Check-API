@@ -3,7 +3,9 @@ package com.mabelowusu.pulse_check_api.service;
 import com.mabelowusu.pulse_check_api.dto.*;
 import com.mabelowusu.pulse_check_api.exception.MonitorNotFoundException;
 import com.mabelowusu.pulse_check_api.model.Monitor;
+import com.mabelowusu.pulse_check_api.model.MonitorStatus;
 import com.mabelowusu.pulse_check_api.repository.MonitorRepository;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -13,20 +15,15 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class MonitorService {
 
     private static final Logger log = LoggerFactory.getLogger(MonitorService.class);
     
-    private MonitorRepository monitorRepository;
-    private TimerService timerService;
-    private AlertService alertService;
-    
-    // Explicit constructor for dependency injection
-    public MonitorService(MonitorRepository monitorRepository, TimerService timerService, AlertService alertService) {
-        this.monitorRepository = monitorRepository;
-        this.timerService = timerService;
-        this.alertService = alertService;
-    }
+    private final MonitorRepository monitorRepository;
+    private final TimerService timerService;
+    private final AlertService alertService;
+
 
     public Monitor createMonitor(String id, Integer timeout, String alertEmail) {
         log.info("Creating monitor: id={}, timeout={}, email={}", id, timeout, alertEmail);
@@ -35,7 +32,15 @@ public class MonitorService {
             throw new IllegalArgumentException("Monitor with ID '" + id + "' already exists");
         }
         
-        Monitor monitor = new Monitor(id, timeout, alertEmail);
+        Monitor monitor = Monitor.builder()
+                .id(id)
+                .timeout(timeout)
+                .alertEmail(alertEmail)
+                .status(MonitorStatus.ACTIVE)
+                .lastHeartbeat(LocalDateTime.now())
+                .expiresAt(LocalDateTime.now().plusSeconds(timeout))
+                .alerted(false)
+                .build();
         monitor = monitorRepository.save(monitor);
         
         // Start the timer for this monitor
@@ -51,14 +56,14 @@ public class MonitorService {
         Monitor monitor = getMonitorById(id);
         
         // Check if device was DOWN and is now recovering
-        boolean wasDown = monitor.getStatus() == Monitor.MonitorStatus.DOWN;
+        boolean wasDown = monitor.getStatus() == MonitorStatus.DOWN;
         LocalDateTime downtimeStart = monitor.getLastHeartbeat();
         
         // Reset timer and update heartbeat
         monitor.resetTimer();
         
         // Set status to ACTIVE only if heartbeat is received
-        monitor.setStatus(Monitor.MonitorStatus.ACTIVE);
+        monitor.setStatus(MonitorStatus.ACTIVE);
         
         monitor = monitorRepository.save(monitor);
         
